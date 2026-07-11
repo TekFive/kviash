@@ -42,7 +42,7 @@ dependencies {
     api("jakarta.servlet:jakarta.servlet-api:6.0.0")
     api("javax.servlet:javax.servlet-api:4.0.1")
     api("org.eclipse.jetty:jetty-server:12.1.7")
-    api("io.undertow:undertow-core:2.3.18.Final")
+    api("io.undertow:undertow-core:2.3.21.Final")
 
     api("org.slf4j:slf4j-api:2.0.16")
 
