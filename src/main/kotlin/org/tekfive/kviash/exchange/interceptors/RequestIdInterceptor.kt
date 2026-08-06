@@ -1,5 +1,6 @@
 package org.tekfive.kviash.exchange.interceptors
 
+import org.tekfive.ack.Ack
 import org.tekfive.kviash.exchange.Exchange
 import org.tekfive.kviash.http.HttpHeader
 import java.util.UUID
@@ -9,9 +10,10 @@ import java.util.UUID
  *
  * Use this interceptor to propagate or generate a request ID that follows the request through
  * the pipeline and into log output. If the incoming request already carries the configured
- * header (defaults to `X-Request-ID`), that value is reused — this preserves trace continuity
- * when requests pass through load balancers or API gateways that assign IDs upstream.
- * Otherwise, a new UUID is generated.
+ * header (defaults to `X-Request-ID`), a bounded prefix of that value is reused — this preserves
+ * trace continuity when requests pass through load balancers or API gateways that assign IDs
+ * upstream without allowing an unbounded client value into logs or persistence. When no value is
+ * supplied, a new UUID is generated.
  *
  * The ID is stored as a request attribute ([RequestIdAttribute]) for use by application code
  * and, when [includeInResponse] is `true`, echoed back in the response header so clients can
@@ -30,6 +32,8 @@ class RequestIdInterceptor(
 
     override fun intercept(exchange: Exchange, continuePipeline: (Exchange) -> Unit) {
         val requestId = exchange.request.getFirstHeaderValue(headerName)
+            ?.takeIf { it.isNotEmpty() }
+            ?.take(MaxRequestIdLengthAck())
             ?: UUID.randomUUID().toString()
 
         exchange.request[RequestIdAttribute] = requestId
@@ -43,5 +47,13 @@ class RequestIdInterceptor(
 
     companion object {
         const val RequestIdAttribute = "RequestIdInterceptor:requestId"
+        val MaxRequestIdLengthAck = Ack.int(
+            "MAXIMUM_REQUEST_ID_LENGTH",
+            DEFAULT_MAX_REQUEST_ID_LENGTH,
+            min = 1,
+            max = DEFAULT_MAX_REQUEST_ID_LENGTH,
+            description = "Maximum accepted request identifier length; longer identifiers are truncated.",
+        )
+        private const val DEFAULT_MAX_REQUEST_ID_LENGTH = 36
     }
 }

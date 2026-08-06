@@ -31,6 +31,25 @@ class RequestIdInterceptorTest {
     }
 
     @Test
+    fun `truncates an oversized request ID to the maximum length`() {
+        val maxLength = RequestIdInterceptor.MaxRequestIdLengthAck()
+        val oversizedRequestId = "x".repeat(maxLength + 1)
+        val rs = MockResponseSource()
+        val exchange = createTestExchange(
+            MockRequestSource(
+                headers = listOf("Host" to listOf("localhost"), "X-Request-ID" to listOf(oversizedRequestId)),
+            ),
+            rs,
+        )
+
+        RequestIdInterceptor().intercept(exchange) { }
+
+        val requestId = exchange.request[RequestIdInterceptor.RequestIdAttribute] as String
+        assertEquals(oversizedRequestId.take(maxLength), requestId)
+        assertEquals(listOf(requestId), rs.headerValues("X-Request-ID"))
+    }
+
+    @Test
     fun `does not include in response when disabled`() {
         val rs = MockResponseSource()
         val exchange = createTestExchange(responseSource = rs)
