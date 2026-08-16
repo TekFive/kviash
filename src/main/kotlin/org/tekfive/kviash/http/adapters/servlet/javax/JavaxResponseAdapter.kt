@@ -96,6 +96,9 @@ class JavaxResponseAdapter(val servletResponse: HttpServletResponse) : HttpRespo
 class BufferedResponseWrapper(response: HttpServletResponse, val outputBuffered: OutputStream) : HttpServletResponseWrapper(response) {
     private var writer: PrintWriter? = null
     private var outputStream: ServletOutputStream? = null
+    private var bufferedCommitted = false
+
+    override fun isCommitted(): Boolean = bufferedCommitted || super.isCommitted
 
     override fun getOutputStream(): ServletOutputStream {
         if (writer != null) throw IllegalStateException("getWriter() has already been called")
@@ -120,5 +123,6 @@ class BufferedResponseWrapper(response: HttpServletResponse, val outputBuffered:
     override fun flushBuffer() {
         writer?.flush()
         outputStream?.flush()
+        bufferedCommitted = true
     }
 }

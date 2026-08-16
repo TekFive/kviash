@@ -47,6 +47,9 @@ class CorsHeaders(
             val allowedOrigin = resolveAllowedOrigin(origin)
             if (allowedOrigin != null) {
                 exchange.response.addHeader("Access-Control-Allow-Origin", allowedOrigin)
+                if (allowedOrigin != "*") {
+                    exchange.response.addVary(HttpHeader.Origin)
+                }
 
                 if (allowCredentials) {
                     exchange.response.addHeader("Access-Control-Allow-Credentials", "true")
@@ -57,6 +60,8 @@ class CorsHeaders(
                 }
 
                 if (exchange.request.method == HttpMethod.OPTIONS) {
+                    exchange.response.addVary("Access-Control-Request-Method")
+                    exchange.response.addVary("Access-Control-Request-Headers")
                     exchange.response.addHeader("Access-Control-Allow-Methods", allowedMethods.joinToString(", "))
                     exchange.response.addHeader("Access-Control-Allow-Headers", allowedHeaders.joinToString(", "))
                     maxAge?.let {

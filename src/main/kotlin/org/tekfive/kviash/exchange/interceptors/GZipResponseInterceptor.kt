@@ -1,12 +1,8 @@
 package org.tekfive.kviash.exchange.interceptors
 
 import org.tekfive.kviash.http.HttpHeader
-import org.tekfive.kviash.http.HttpResponse
 import org.tekfive.kviash.exchange.Exchange
 import java.io.ByteArrayOutputStream
-import java.io.OutputStream
-import java.io.OutputStreamWriter
-import java.io.Writer
 import java.util.zip.GZIPOutputStream
 
 /**
@@ -39,18 +35,33 @@ class GZipResponseInterceptor(
             return
         }
 
-        exchange.response.addHeader("Content-Encoding", "gzip")
-        exchange.response.addHeader("Vary", "Accept-Encoding")
-        val gzipOutput = GZIPOutputStream(exchange.response.outputStream)
-        val gzipResponse = exchange.response.createdBufferedResponse(gzipOutput)
-        continuePipeline(Exchange(exchange, response = gzipResponse))
-        gzipResponse.commit()
-        gzipOutput.close()
+        val compressedBuffer = ByteArrayOutputStream()
+        GZIPOutputStream(compressedBuffer).use { gzipOutput ->
+            val bufferedResponse = exchange.response.createdBufferedResponse(gzipOutput)
+            continuePipeline(Exchange(exchange, response = bufferedResponse))
+            bufferedResponse.commit()
+        }
+        val compressedBody = compressedBuffer.toByteArray()
+
+        exchange.response.setHeader(HttpHeader(HttpHeader.ContentEncoding, "gzip"))
+        exchange.response.addVary(HttpHeader.AcceptEncoding)
+        exchange.response.setContentLength(compressedBody.size.toLong())
+        exchange.response.outputStream.write(compressedBody)
+        exchange.response.commit()
     }
 
     private fun acceptsGzip(exchange: Exchange): Boolean {
         val acceptEncoding = exchange.request.getFirstHeaderValue(HttpHeader.AcceptEncoding) ?: return false
-        return acceptEncoding.split(',').any { it.trim().lowercase().startsWith("gzip") }
+        return acceptEncoding.split(',').any { value ->
+            val parts = value.split(';').map { it.trim() }
+            parts.firstOrNull().equals("gzip", ignoreCase = true) &&
+                parts.drop(1).none { parameter ->
+                    val (name, quality) = parameter.split('=', limit = 2).let {
+                        it.firstOrNull()?.trim() to it.getOrNull(1)?.trim()
+                    }
+                    name.equals("q", ignoreCase = true) && quality?.toDoubleOrNull() == 0.0
+                }
+        }
     }
 
     companion object {

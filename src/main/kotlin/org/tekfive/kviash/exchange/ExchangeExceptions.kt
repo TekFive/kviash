@@ -92,23 +92,23 @@ open class ReturnErrorStatus(
 ) : ExchangeException(exceptionMessage) {
     companion object {
         fun onNotFound(body: String? = null, message: String = HttpErrorCode.NOT_FOUND.toString()): Nothing {
-            throw ReturnErrorStatus(HttpErrorCode.NOT_FOUND, body, message)
+            throw ReturnErrorStatus(HttpErrorCode.NOT_FOUND, body = body, exceptionMessage = message)
         }
 
         fun onBadRequest(body: String? = null, message: String = HttpErrorCode.BAD_REQUEST.toString()): Nothing {
-            throw ReturnErrorStatus(HttpErrorCode.BAD_REQUEST, body, message)
+            throw ReturnErrorStatus(HttpErrorCode.BAD_REQUEST, body = body, exceptionMessage = message)
         }
 
         fun onUnauthorized(body: String? = null, message: String = HttpErrorCode.UNAUTHORIZED.toString()): Nothing {
-            throw ReturnErrorStatus(HttpErrorCode.UNAUTHORIZED, body, message)
+            throw ReturnErrorStatus(HttpErrorCode.UNAUTHORIZED, body = body, exceptionMessage = message)
         }
 
         fun onForbidden(body: String? = null, message: String = HttpErrorCode.FORBIDDEN.toString()): Nothing {
-            throw ReturnErrorStatus(HttpErrorCode.FORBIDDEN, body, message)
+            throw ReturnErrorStatus(HttpErrorCode.FORBIDDEN, body = body, exceptionMessage = message)
         }
 
         fun onServerError(body: String? = null, message: String = HttpErrorCode.INTERNAL_SERVER_ERROR.toString()): Nothing {
-            throw ReturnErrorStatus(HttpErrorCode.INTERNAL_SERVER_ERROR, body, message)
+            throw ReturnErrorStatus(HttpErrorCode.INTERNAL_SERVER_ERROR, body = body, exceptionMessage = message)
         }
     }
 }

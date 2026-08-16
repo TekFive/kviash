@@ -1,6 +1,9 @@
 package org.tekfive.kviash.http.adapters.undertow
 
 import io.undertow.server.HttpServerExchange
+import io.undertow.server.handlers.form.FormData
+import io.undertow.server.handlers.form.FormDataParser
+import io.undertow.server.handlers.form.FormParserFactory
 import io.undertow.util.Sessions
 import org.tekfive.kviash.http.HttpRequestSource
 import org.tekfive.kviash.http.HttpSession
@@ -34,8 +37,17 @@ class UndertowRequestAdapter(val exchange: HttpServerExchange) : HttpRequestSour
     }
 
     override val parameters: List<Pair<String, List<String>>>
-        get() = exchange.queryParameters.map { (name, values) ->
-            Pair(name, values.toList())
+        get() {
+            val parameters = linkedMapOf<String, MutableList<String>>()
+            exchange.queryParameters.forEach { (name, values) ->
+                parameters.getOrPut(name) { mutableListOf() }.addAll(values)
+            }
+            parsedFormData?.let { formData ->
+                formData.forEach { name ->
+                    parameters.getOrPut(name) { mutableListOf() }.addAll(formDataValues(formData, name))
+                }
+            }
+            return parameters.map { (name, values) -> name to values.toList() }
         }
 
     override val clientIp: String
@@ -73,4 +85,20 @@ class UndertowRequestAdapter(val exchange: HttpServerExchange) : HttpRequestSour
     }
 
     private val attributes = mutableMapOf<String, Any?>()
+
+    private val parsedFormData: FormData? by lazy {
+        exchange.getAttachment(FormDataParser.FORM_DATA)
+            ?: formParserFactory.createParser(exchange)?.use { it.parseBlocking() }
+    }
+
+    private fun formDataValues(formData: FormData, name: String): List<String> {
+        return formData[name]
+            ?.filterNot { it.isFileItem }
+            ?.map { it.value }
+            ?: emptyList()
+    }
+
+    companion object {
+        private val formParserFactory = FormParserFactory.builder().build()
+    }
 }

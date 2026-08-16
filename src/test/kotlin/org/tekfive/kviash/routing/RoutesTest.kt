@@ -549,6 +549,46 @@ class RoutesTest {
         assertEquals("https://app.com/files/readme.txt", url)
     }
 
+    @Test
+    fun `getUrl percent-encodes path parameter values`() {
+        Router.clearRegistry()
+        var urlGen: Routes? = null
+        RouteTable.register(name = "url-encoding") {
+            add("/capture", HttpMethod.GET) { ex ->
+                urlGen = ex.routes
+                null
+            }
+        }
+        Router.route(
+            UrlGenMockRequestSource(path = "/capture"),
+            UrlGenMockResponseSource(),
+            listOf("url-encoding"),
+        )
+
+        val url = urlGen!!.getUrl("/users/{}", "https://app.com", "A+B /?#")
+        assertEquals("https://app.com/users/A%2BB%20%2F%3F%23", url)
+    }
+
+    @Test
+    fun `getUrl preserves separators for gobbler values while encoding segments`() {
+        Router.clearRegistry()
+        var urlGen: Routes? = null
+        RouteTable.register(name = "url-gobbler") {
+            add("/capture", HttpMethod.GET) { ex ->
+                urlGen = ex.routes
+                null
+            }
+        }
+        Router.route(
+            UrlGenMockRequestSource(path = "/capture"),
+            UrlGenMockResponseSource(),
+            listOf("url-gobbler"),
+        )
+
+        val url = urlGen!!.getUrl("/files/{**}", "https://app.com", "a folder/file+name.txt")
+        assertEquals("https://app.com/files/a%20folder/file%2Bname.txt", url)
+    }
+
     // -----------------------------------------------------------------------
     // getUrl with KFunction
     // -----------------------------------------------------------------------

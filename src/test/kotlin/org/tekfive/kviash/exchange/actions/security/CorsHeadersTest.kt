@@ -30,6 +30,7 @@ class CorsHeadersTest {
         CorsHeaders(allowCredentials = true).invoke(exchange)
         assertEquals(listOf("http://example.com"), rs.headerValues("Access-Control-Allow-Origin"))
         assertEquals(listOf("true"), rs.headerValues("Access-Control-Allow-Credentials"))
+        assertTrue(rs.headerValues("Vary").single().contains("Origin"))
     }
 
     @Test
@@ -41,6 +42,7 @@ class CorsHeadersTest {
         )
         CorsHeaders(allowedOrigins = setOf("http://allowed.com")).invoke(exchange)
         assertEquals(listOf("http://allowed.com"), rs.headerValues("Access-Control-Allow-Origin"))
+        assertTrue(rs.headerValues("Vary").single().contains("Origin"))
     }
 
     @Test
@@ -70,6 +72,9 @@ class CorsHeadersTest {
         assertTrue(rs.headerValues("Access-Control-Allow-Methods").isNotEmpty())
         assertTrue(rs.headerValues("Access-Control-Allow-Headers").isNotEmpty())
         assertEquals(listOf("3600"), rs.headerValues("Access-Control-Max-Age"))
+        val vary = rs.headerValues("Vary").single()
+        assertTrue(vary.contains("Access-Control-Request-Method"))
+        assertTrue(vary.contains("Access-Control-Request-Headers"))
     }
 
     @Test

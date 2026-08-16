@@ -25,14 +25,20 @@ internal class LiteralRouteSegmentMatcher(
     val literalSegment: String,
     val ignoreCase: Boolean) : RouteSegmentMatcher(literalSegment, false) {
 
+    private val canonicalLiteral = if (ignoreCase) literalSegment.lowercase() else literalSegment
+
     override fun matches(segment: String): Boolean {
-        return literalSegment.equals(segment, ignoreCase)
+        return canonicalLiteral == if (ignoreCase) segment.lowercase() else segment
     }
 
     override fun compareTo(other: RouteSegmentMatcher): Int {
         return when (other) {
             is LiteralRouteSegmentMatcher -> {
-                literalSegment.compareTo(other.literalSegment)
+                if (ignoreCase && other.ignoreCase) {
+                    canonicalLiteral.compareTo(other.canonicalLiteral)
+                } else {
+                    literalSegment.compareTo(other.literalSegment)
+                }
             }
 
             else -> {
@@ -48,14 +54,14 @@ internal class LiteralRouteSegmentMatcher(
         other as LiteralRouteSegmentMatcher
 
         if (ignoreCase != other.ignoreCase) return false
-        if (literalSegment != other.literalSegment) return false
+        if (canonicalLiteral != other.canonicalLiteral) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = ignoreCase.hashCode()
-        result = 31 * result + literalSegment.hashCode()
+        result = 31 * result + canonicalLiteral.hashCode()
         return result
     }
 }
@@ -127,5 +133,3 @@ internal object GobblerSegmentMatcher : RouteSegmentMatcher("{**}", true) {
         }
     }
 }
-
-

@@ -99,6 +99,7 @@ class JettyBufferedResponseAdapter(
     private val outputBuffer: OutputStream
 ) : HttpResponseSource {
     private var writer: Writer? = null
+    private var bufferedCommitted = false
 
     override val status: Int
         get() = delegate.status
@@ -107,7 +108,7 @@ class JettyBufferedResponseAdapter(
         get() = delegate.headers
 
     override val committed: Boolean
-        get() = delegate.committed
+        get() = bufferedCommitted || delegate.committed
 
     override val outputStream: OutputStream
         get() = outputBuffer
@@ -131,6 +132,7 @@ class JettyBufferedResponseAdapter(
     override fun commit() {
         writer?.flush()
         outputBuffer.flush()
+        bufferedCommitted = true
     }
 
     override fun createdBufferedResponse(outputBuffer: OutputStream): HttpResponseSource {

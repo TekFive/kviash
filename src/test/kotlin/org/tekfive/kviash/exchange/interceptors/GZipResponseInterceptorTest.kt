@@ -188,6 +188,20 @@ class GZipResponseInterceptorTest {
     }
 
     @Test
+    fun `Content-Length describes compressed output`() {
+        val responseSource = GzipMockResponseSource()
+        val exchange = createExchange(responseSource)
+
+        GZipResponseInterceptor().intercept(exchange) { ex ->
+            val body = "compressible response body".repeat(50).toByteArray()
+            ex.response.setContentLength(body.size.toLong())
+            ex.response.outputStream.write(body)
+        }
+
+        assertEquals(responseSource.rawBytes.size.toString(), responseSource.getHeaderValues(HttpHeader.ContentLength).single())
+    }
+
+    @Test
     fun `handles empty body`() {
         val responseSource = GzipMockResponseSource()
         val exchange = createExchange(responseSource)
@@ -438,5 +452,21 @@ class GZipResponseInterceptorTest {
 
         val decompressed = decompressGzip(responseSource.rawBytes)
         assertEquals(text, decompressed)
+    }
+
+    @Test
+    fun `checkForAcceptHeader true rejects gzip with zero quality`() {
+        val responseSource = GzipMockResponseSource()
+        val exchange = createExchange(responseSource, requestHeaders = listOf(
+            "Host" to listOf("localhost"),
+            "Accept-Encoding" to listOf("gzip;q=0, br"),
+        ))
+
+        GZipResponseInterceptor(checkForAcceptHeader = true).intercept(exchange) { ex ->
+            ex.response.outputStream.write("plain".toByteArray())
+        }
+
+        assertEquals("plain", String(responseSource.rawBytes))
+        assertTrue(responseSource.getHeaderValues(HttpHeader.ContentEncoding).isEmpty())
     }
 }

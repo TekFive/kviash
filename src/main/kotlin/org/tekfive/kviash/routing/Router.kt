@@ -101,6 +101,9 @@ object Router {
             try {
                 pipeline(exchange)
             } catch (e: TerminateExchangeException) {} catch (e : Exception) {
+                if (!responseSource.committed && !responseSource.status.isHttpError) {
+                    responseSource.setStatus(HttpErrorCode.INTERNAL_SERVER_ERROR.code)
+                }
                 pipeline.configuration.exchangeErrorLogger.error(e, exchange)
             }
         } else {
@@ -121,6 +124,9 @@ object Router {
                 try {
                     notFoundPipeline(exchange)
                 } catch (e: TerminateExchangeException) {} catch (e: Exception) {
+                    if (!responseSource.committed && !responseSource.status.isHttpError) {
+                        responseSource.setStatus(HttpErrorCode.INTERNAL_SERVER_ERROR.code)
+                    }
                     notFoundPipeline.configuration.exchangeErrorLogger.error(e, exchange)
                 }
             } else {

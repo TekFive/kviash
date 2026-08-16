@@ -3,6 +3,7 @@ package org.tekfive.kviash.routing
 import org.tekfive.kviash.exchange.Exchange
 import org.tekfive.kviash.exchange.ExchangeAction
 import org.tekfive.kviash.exchange.HttpErrorCode
+import org.tekfive.kviash.exchange.interceptors.PipelineInterceptor
 import org.tekfive.kviash.http.*
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -635,6 +636,17 @@ class RouteTableTest {
         }
     }
 
+    @Test
+    fun `case-insensitive duplicate route throws`() {
+        Router.clearRegistry()
+        assertFailsWith<IllegalStateException> {
+            RouteTable.register("case-duplicate") {
+                add("/Users", HttpMethod.GET) { null }
+                add("/users", HttpMethod.GET) { null }
+            }
+        }
+    }
+
     // -- Case sensitivity --
 
     @Test
@@ -647,6 +659,21 @@ class RouteTableTest {
 
         routeRequest(path = "/hello/world")
         assertTrue(invoked, "Case-insensitive routing should match")
+    }
+
+    @Test
+    fun `interceptor exception sets internal server error`() {
+        Router.clearRegistry()
+        val interceptor = object : PipelineInterceptor {
+            override fun intercept(exchange: Exchange, continuePipeline: (Exchange) -> Unit) {
+                throw IllegalStateException("interceptor failed")
+            }
+        }
+        RouteTable.register("interceptor-error", interceptor = interceptor) {
+            add("/failure", HttpMethod.GET) { null }
+        }
+
+        assertEquals(500, routeRequest(path = "/failure").status)
     }
 
     // -- Multi-function add convenience methods --

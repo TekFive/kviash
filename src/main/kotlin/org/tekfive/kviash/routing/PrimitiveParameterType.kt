@@ -20,7 +20,7 @@ internal enum class PrimitiveParameterType(
     StringType(
         String::class,
         Regex(".*"),
-        { URLDecoder.decode(it, Charsets.UTF_8) }
+        { URLDecoder.decode(it.replace("+", "%2B"), Charsets.UTF_8) }
     ),
 
     CharType(

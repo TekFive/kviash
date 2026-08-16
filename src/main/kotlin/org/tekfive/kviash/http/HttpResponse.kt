@@ -58,6 +58,19 @@ class HttpResponse(
         source.setHeader(header)
     }
 
+    fun addVary(value: String) {
+        val values = source.getHeaderValues(HttpHeader.Vary)
+            .flatMap { it.split(',') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toMutableList()
+
+        if (values.none { it.equals(value, ignoreCase = true) }) {
+            values.add(value)
+        }
+        source.setHeader(HttpHeader(HttpHeader.Vary, values.joinToString(", ")))
+    }
+
     fun setContentLength(contentLength: Long) {
         source.setHeader(HttpHeader(HttpHeader.ContentLength, contentLength.toString()))
     }

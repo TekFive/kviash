@@ -9,26 +9,18 @@ plugins {
 }
 
 group = "org.tekfive"
-version = "1.0.0"
+version = providers.gradleProperty("releaseVersion").getOrElse("1.0.0")
 
 repositories {
-    mavenLocal()
     mavenCentral()
-    // org.tekfive sibling libs, each resolved from its own GitHub Packages registry. The packages
-    // are public, so any valid token works — the build's GITHUB_TOKEN (CI) or gpr.user/gpr.key.
-    listOf("TekFive/ack", "TekFive/jfk", "TekFive/kviash", "TekFive/keep", "TekFive/konnekt").forEach { ghRepo ->
-        maven {
-            name = "GitHubPackages-${ghRepo.substringAfter('/')}"
-            url = uri("https://maven.pkg.github.com/$ghRepo")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR") ?: findProperty("gpr.user") as String?
-                password = System.getenv("GITHUB_TOKEN") ?: findProperty("gpr.key") as String?
-            }
-        }
+    maven {
+        name = "JitPack"
+        url = uri("https://jitpack.io")
     }
 }
 
 java {
+    withSourcesJar()
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
@@ -37,8 +29,8 @@ java {
 dependencies {
     api(kotlin("stdlib"))
     api(kotlin("reflect"))
-    api("org.tekfive:ack:1.0.0")
-    api("org.tekfive:jfk:1.0.0")
+    api("com.github.TekFive:ack:v1.0.0")
+    api("com.github.TekFive:jfk:v1.0.0")
     api("jakarta.servlet:jakarta.servlet-api:6.0.0")
     api("javax.servlet:javax.servlet-api:4.0.1")
     api("org.eclipse.jetty:jetty-server:12.1.7")

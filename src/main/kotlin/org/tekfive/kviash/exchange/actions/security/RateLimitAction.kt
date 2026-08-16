@@ -3,6 +3,8 @@ package org.tekfive.kviash.exchange.actions.security
 import org.tekfive.kviash.exchange.Exchange
 import org.tekfive.kviash.exchange.ExchangeAction
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Throttles requests per client using a fixed-window rate limiting algorithm.
@@ -20,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * State is held in memory, so limits are per-process and reset on restart. For distributed
  * rate limiting across multiple application instances, use an external store and a custom
- * action.
+ * action. At most [maxTrackedClients] active client windows are retained; additional new
+ * clients receive a `429` response until an existing window expires.
  *
  * ```kotlin
  * RouteTable.register(preActions = listOf(
@@ -32,26 +35,52 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class RateLimitAction(
     val settings: RateLimitSettings = RateLimitSettings.Default(),
+    val maxTrackedClients: Int = 10_000,
 ) : ExchangeAction {
 
     constructor(
         maxRequests: Int = 100,
         windowMillis: Long = 60_000,
         clientKeyExtractor: (Exchange) -> String = { it.request.clientIp },
-    ) : this(RateLimitSettings.Default(maxRequests, windowMillis, clientKeyExtractor))
+        maxTrackedClients: Int = 10_000,
+    ) : this(RateLimitSettings.Default(maxRequests, windowMillis, clientKeyExtractor), maxTrackedClients)
 
     internal val clients = ConcurrentHashMap<String, ClientWindow>()
+    private val clientPermits = Semaphore(maxTrackedClients)
+    private val lastCleanupAt = AtomicLong(0)
+
+    init {
+        require(settings.maxRequests > 0) { "maxRequests must be greater than zero" }
+        require(settings.windowMillis > 0) { "windowMillis must be greater than zero" }
+        require(maxTrackedClients > 0) { "maxTrackedClients must be greater than zero" }
+    }
 
     override fun invoke(exchange: Exchange): Any? {
         val clientKey = settings.clientKeyExtractor(exchange)
         val now = System.currentTimeMillis()
+        cleanupExpiredClients(now)
+
+        var capacityExceeded = false
         val window = clients.compute(clientKey) { _, existing ->
             if (existing == null || now - existing.windowStart >= settings.windowMillis) {
-                ClientWindow(now, 1)
+                if (existing == null && !clientPermits.tryAcquire()) {
+                    capacityExceeded = true
+                    null
+                } else {
+                    ClientWindow(now, 1)
+                }
             } else {
                 ClientWindow(existing.windowStart, existing.count + 1)
             }
-        }!!
+        }
+
+        if (capacityExceeded || window == null) {
+            exchange.response.addHeader("X-RateLimit-Limit", settings.maxRequests.toString())
+            exchange.response.addHeader("X-RateLimit-Remaining", "0")
+            exchange.response.addHeader("Retry-After", ((settings.windowMillis + 999) / 1000).toString())
+            exchange.response.sendStatus(429)
+            return null
+        }
 
         val remaining = (settings.maxRequests - window.count).coerceAtLeast(0)
         exchange.response.addHeader("X-RateLimit-Limit", settings.maxRequests.toString())
@@ -64,6 +93,27 @@ class RateLimitAction(
         }
 
         return null
+    }
+
+    private fun cleanupExpiredClients(now: Long) {
+        val cleanupInterval = if (clientPermits.availablePermits() == 0) {
+            settings.windowMillis.coerceAtMost(1_000)
+        } else {
+            settings.windowMillis.coerceAtMost(60_000)
+        }
+        val previousCleanup = lastCleanupAt.get()
+        if (now - previousCleanup < cleanupInterval) {
+            return
+        }
+        if (!lastCleanupAt.compareAndSet(previousCleanup, now)) {
+            return
+        }
+
+        for ((key, window) in clients) {
+            if (now - window.windowStart >= settings.windowMillis && clients.remove(key, window)) {
+                clientPermits.release()
+            }
+        }
     }
 
     internal data class ClientWindow(val windowStart: Long, val count: Int)

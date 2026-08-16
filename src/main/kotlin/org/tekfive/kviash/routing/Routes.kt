@@ -7,6 +7,7 @@ import org.tekfive.kviash.exchange.RedirectType
 import org.tekfive.kviash.exchange.Exchange
 import org.tekfive.kviash.exchange.ExchangePipeline
 import org.tekfive.kviash.exchange.actions.static.KeyedResourceDir
+import java.net.URLEncoder
 import kotlin.reflect.KFunction
 
 fun KFunction<*>.throwRedirectTo(): Nothing {
@@ -61,10 +62,15 @@ class Routes internal constructor(
                     break
                 }
 
-                indicesSegments[nextReplacementIndex] = if (pathValue is HasRouteParameter) {
+                val rawValue = if (pathValue is HasRouteParameter) {
                     pathValue.getParameter()
                 } else {
                     pathValue.toString()
+                }
+                indicesSegments[nextReplacementIndex] = if (indicesSegments[nextReplacementIndex] == "{**}") {
+                    rawValue.split('/').joinToString("/") { encodePathSegment(it) }
+                } else {
+                    encodePathSegment(rawValue)
                 }
             }
 
@@ -154,4 +160,10 @@ class Routes internal constructor(
                 ?: throw IllegalStateException("No thread local exchange set.")
     }
 
+}
+
+private fun encodePathSegment(value: String): String {
+    return URLEncoder.encode(value, Charsets.UTF_8)
+        .replace("+", "%20")
+        .replace("%7E", "~", ignoreCase = true)
 }

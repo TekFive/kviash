@@ -78,4 +78,45 @@ class RateLimitActionTest {
         action.invoke(createTestExchange(responseSource = rs))
         assertTrue(!rs.committed)
     }
+
+    @Test
+    fun `rejects new clients when tracking capacity is reached`() {
+        var clientKey = "a"
+        val action = RateLimitAction(
+            maxRequests = 10,
+            windowMillis = 60_000,
+            clientKeyExtractor = { clientKey },
+            maxTrackedClients = 2,
+        )
+        action.invoke(createTestExchange())
+        clientKey = "b"
+        action.invoke(createTestExchange())
+
+        clientKey = "c"
+        val rs = MockResponseSource()
+        action.invoke(createTestExchange(responseSource = rs))
+
+        assertEquals(429, rs.status)
+        assertEquals(2, action.clients.size)
+    }
+
+    @Test
+    fun `expired clients release tracking capacity`() {
+        var clientKey = "a"
+        val action = RateLimitAction(
+            maxRequests = 10,
+            windowMillis = 1,
+            clientKeyExtractor = { clientKey },
+            maxTrackedClients = 1,
+        )
+        action.invoke(createTestExchange())
+        Thread.sleep(5)
+
+        clientKey = "b"
+        val rs = MockResponseSource()
+        action.invoke(createTestExchange(responseSource = rs))
+
+        assertTrue(!rs.committed)
+        assertEquals(setOf("b"), action.clients.keys)
+    }
 }

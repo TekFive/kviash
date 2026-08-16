@@ -253,6 +253,22 @@ class ExchangePipelineTest {
     }
 
     @Test
+    fun `ReturnErrorStatus helper keeps message separate from content type`() {
+        val pipeline = createPipeline(
+            action = ExchangeAction {
+                ReturnErrorStatus.onBadRequest("Invalid request body.", message = "invalid payload")
+            },
+        )
+        val responseSource = PipelineMockResponseSource()
+        val exchange = createExchange(pipeline, responseSource = responseSource)
+        pipeline(exchange)
+
+        assertEquals(400, responseSource._status)
+        assertTrue(responseSource.getHeaderValues(HttpHeader.ContentType).isEmpty())
+        assertEquals("invalid payload", exchange.exceptions.single().message)
+    }
+
+    @Test
     fun `TerminateExchangeException propagates out`() {
         val pipeline = createPipeline(
             action = ExchangeAction { throw TerminateExchangeException("terminated") },

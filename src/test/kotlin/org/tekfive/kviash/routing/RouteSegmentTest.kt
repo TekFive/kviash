@@ -176,6 +176,22 @@ class RouteSegmentMatcherTest {
     }
 
     @Test
+    fun `case-insensitive literal matchers have consistent equality and hash codes`() {
+        val lower = LiteralRouteSegmentMatcher("users", true)
+        val upper = LiteralRouteSegmentMatcher("USERS", true)
+
+        assertEquals(lower, upper)
+        assertEquals(lower.hashCode(), upper.hashCode())
+        assertEquals(0, lower.compareTo(upper))
+    }
+
+    @Test
+    fun `string path parameters preserve plus characters`() {
+        assertEquals("a+b", PrimitiveParameterType.StringType.segmentToValue("a+b"))
+        assertEquals("a+b", PrimitiveParameterType.StringType.segmentToValue("a%2Bb"))
+    }
+
+    @Test
     fun `literal matcher compareTo other literal`() {
         val a = LiteralRouteSegmentMatcher("a", false)
         val b = LiteralRouteSegmentMatcher("b", false)
