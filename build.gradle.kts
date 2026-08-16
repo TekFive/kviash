@@ -30,7 +30,8 @@ dependencies {
     api(kotlin("stdlib"))
     api(kotlin("reflect"))
     api("com.github.TekFive:ack:v1.0.0")
-    api("com.github.TekFive:jfk:v1.0.0")
+    // Exact commit tagged v1.0.0. JitPack's tag coordinate collides with the legacy 1.0.0 tag.
+    api("com.github.TekFive:jfk:55b9e2676e")
     api("jakarta.servlet:jakarta.servlet-api:6.0.0")
     api("javax.servlet:javax.servlet-api:4.0.1")
     api("org.eclipse.jetty:jetty-server:12.1.7")
