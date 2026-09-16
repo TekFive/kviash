@@ -55,11 +55,12 @@ internal enum class RouteFunctionParameterType(val clazz: KClass<*>, val takenFr
             if (PrimitiveParameterType.fromClass(clazz) != null) {
                 return PrimitiveType
             }
-            if (clazz.companionObjectInstance is FromJsonObject<*>) {
-                return JfkFromJsonObjectType
-            }
+            // Explicit custom providers take precedence over inferred JSON body mapping.
             if (customParameterRegistry != null && customParameterRegistry.isRegistered(clazz)) {
                 return RegisteredCustomType
+            }
+            if (clazz.companionObjectInstance is FromJsonObject<*>) {
+                return JfkFromJsonObjectType
             }
 
             return null

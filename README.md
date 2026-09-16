@@ -54,7 +54,7 @@ This design works equally well for traditional server-rendered web applications,
 Gradle dependency:
 
 ```kotlin
-implementation("org.tekfive:kviash:1.0.0")
+implementation("org.tekfive:kviash:1.0.1")
 ```
 
 ## Development
@@ -540,6 +540,11 @@ RouteTable.register(customParameterRegistry = registry) {
     add(controller::getDashboard) // fun getDashboard(user: CurrentUser): String
 }
 ```
+
+Register providers before registering routes. A registered custom type is injected
+from its provider even if its companion implements `FromJsonObject`; it does not
+consume the request body or count as a body parameter. Without a registered
+provider, a type with a `FromJsonObject` companion is parsed from the request body.
 
 ## Error Handling
 

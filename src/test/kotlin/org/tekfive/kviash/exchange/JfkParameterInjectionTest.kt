@@ -14,6 +14,7 @@ import java.io.ByteArrayInputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 
 object JsonBodyController {
     var lastJsonObject: JsonObject? = null
@@ -48,6 +49,13 @@ object JsonBodyController {
         postInvoked = true
         lastTypedBody = body
         return JsonObject(mapOf("name" to body.name, "count" to body.count))
+    }
+
+    fun postTypedAndObject(actor: TestBody, body: JsonObject): JsonObject {
+        postInvoked = true
+        lastTypedBody = actor
+        lastJsonObject = body
+        return body
     }
 
     fun postNullableObject(body: JsonObject?): JsonObject {
@@ -148,6 +156,44 @@ class JfkParameterInjectionTest {
         assertEquals(true, JsonBodyController.postInvoked)
         assertEquals("test", JsonBodyController.lastTypedBody?.name)
         assertEquals(42, JsonBodyController.lastTypedBody?.count)
+    }
+
+    @Test
+    fun `registered FromJsonObject parameter is injected without a request body`() {
+        Router.clearRegistry()
+        JsonBodyController.reset()
+        val actor = TestBody("injected", 7)
+        val registry = CustomParameterRegistry()
+        registry.registerProvider(TestBody::class) { actor }
+        RouteTable.register("json-custom", postAction = SendJfkResponse, customParameterRegistry = registry) {
+            add("/items", JsonBodyController::postTyped)
+        }
+
+        val response = routeRequest(method = "POST", path = "/items")
+
+        assertEquals(200, response.status)
+        assertEquals(true, JsonBodyController.postInvoked)
+        assertSame(actor, JsonBodyController.lastTypedBody)
+    }
+
+    @Test
+    fun `registered FromJsonObject parameter can accompany a required JSON body`() {
+        Router.clearRegistry()
+        JsonBodyController.reset()
+        val actor = TestBody("injected", 7)
+        val registry = CustomParameterRegistry()
+        registry.registerProvider(TestBody::class) { actor }
+        RouteTable.register("json-custom-and-body", postAction = SendJfkResponse, customParameterRegistry = registry) {
+            add("/items", JsonBodyController::postTypedAndObject)
+        }
+
+        val response = routeRequest(method = "POST", path = "/items", body = """{"name":"body","count":42}""")
+
+        assertEquals(200, response.status)
+        assertEquals(true, JsonBodyController.postInvoked)
+        assertSame(actor, JsonBodyController.lastTypedBody)
+        assertEquals("body", JsonBodyController.lastJsonObject?.string("name"))
+        assertEquals(42, JsonBodyController.lastJsonObject?.get("count")?.int)
     }
 
     @Test
