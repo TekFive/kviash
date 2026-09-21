@@ -54,7 +54,7 @@ This design works equally well for traditional server-rendered web applications,
 Gradle dependency:
 
 ```kotlin
-implementation("org.tekfive:kviash:1.0.1")
+implementation("org.tekfive:kviash:1.0.2")
 ```
 
 ## Development
@@ -344,6 +344,22 @@ fun getUser(id: Int): String = ...      // GET /users/{} — matches integer seg
 fun getByName(name: String): String = ... // GET /users/{} — matches any segment
 ```
 
+`java.util.UUID` is also supported without a custom provider or pattern:
+
+```kotlin
+import java.util.UUID
+
+fun getUser(id: UUID): String = id.toString()
+
+RouteTable.register {
+    add("/users/{}", ::getUser)
+}
+```
+
+UUID segments use the standard `8-4-4-4-12` hyphenated hexadecimal format,
+with either uppercase or lowercase letters. Malformed UUIDs do not match the
+inferred route.
+
 Use `{regex}` for explicit patterns:
 
 ```kotlin
@@ -518,6 +534,7 @@ Route functions can declare parameters that KViash automatically injects:
 | `HttpSession` | The session (nullable = don't create) |
 | `URL` | The full request URL |
 | `Int`, `Long`, `String`, etc. | Path segment values |
+| `java.util.UUID` | UUID path segment values |
 
 ```kotlin
 fun getUser(id: Int, request: HttpRequest): String {

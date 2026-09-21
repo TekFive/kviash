@@ -1,7 +1,10 @@
 package org.tekfive.kviash.routing
 
 import java.net.URLDecoder
+import java.util.UUID
 import kotlin.reflect.KClass
+
+private val uuidPattern = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 internal fun repeat(str: String?, times: Int): String {
     val builder = StringBuilder()
@@ -21,6 +24,13 @@ internal enum class PrimitiveParameterType(
         String::class,
         Regex(".*"),
         { URLDecoder.decode(it.replace("+", "%2B"), Charsets.UTF_8) }
+    ),
+
+    UuidType(
+        UUID::class,
+        uuidPattern,
+        // Validate the full format even when an explicit route pattern is used.
+        { if (uuidPattern.matches(it)) UUID.fromString(it) else null }
     ),
 
     CharType(
