@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "org.tekfive"
-version = providers.gradleProperty("releaseVersion").getOrElse("1.0.2")
+version = providers.gradleProperty("releaseVersion").getOrElse("1.0.3")
 
 repositories {
     mavenCentral()

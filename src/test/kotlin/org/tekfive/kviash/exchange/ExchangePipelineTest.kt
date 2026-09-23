@@ -9,8 +9,10 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.io.Writer
+import java.lang.reflect.InvocationTargetException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -224,20 +226,97 @@ class ExchangePipelineTest {
     }
 
     @Test
-    fun `exception in pre-action sets 500 status and action still runs if not committed`() {
-        var actionRan = false
-        val pipeline = createPipeline(
-            preActions = listOf(ExchangeAction { throw RuntimeException("pre-boom") }),
-            action = ExchangeAction { actionRan = true; null },
+    fun `pre-action exceptions skip remaining guards and controller regardless of commitment`() {
+        val failures = listOf(
+            RuntimeException("pre-boom") to 500,
+            ReturnErrorStatus(HttpErrorCode.FORBIDDEN) to 403,
+            ReturnErrorStatus(HttpErrorCode.UNAUTHORIZED, body = "Unauthorized") to 401,
+            InvocationTargetException(ReturnErrorStatus(HttpErrorCode.FORBIDDEN)) to 403,
         )
-        val responseSource = PipelineMockResponseSource()
-        val exchange = createExchange(pipeline, responseSource = responseSource)
+        for ((failure, expectedStatus) in failures) {
+            for (committed in listOf(false, true)) {
+                val order = mutableListOf<String>()
+                val interceptor = object : PipelineInterceptor {
+                    override fun intercept(exchange: Exchange, continuePipeline: (Exchange) -> Unit) {
+                        order.add("before")
+                        continuePipeline(exchange)
+                        order.add("after")
+                    }
+                }
+                val pipeline = createPipeline(
+                    interceptors = listOf(interceptor),
+                    preActions = listOf(
+                        ExchangeAction { order.add("pre1"); null },
+                        ExchangeAction {
+                            order.add("failure")
+                            if (committed) it.response.commit()
+                            throw failure
+                        },
+                        ExchangeAction { order.add("pre3"); null },
+                    ),
+                    action = ExchangeAction { order.add("action"); "controller result" },
+                    postActions = listOf(ExchangeAction { order.add("post"); null }),
+                )
+                val exchange = createExchange(pipeline)
+                pipeline(exchange)
+
+                val expectedOrder = if (committed) {
+                    listOf("before", "pre1", "failure", "after")
+                } else {
+                    listOf("before", "pre1", "failure", "post", "after")
+                }
+                assertEquals(expectedOrder, order, "$failure, committed=$committed")
+                assertEquals(if (committed) 200 else expectedStatus, exchange.response.status)
+                if (!committed) {
+                    val cause = if (failure is InvocationTargetException) failure.targetException else failure
+                    assertEquals(listOf(cause), exchange.exceptions)
+                }
+                assertNull(exchange.actionResult)
+                assertEquals(ExchangeState.COMPLETE, exchange.state)
+                assertNull(Exchange.getExchange())
+            }
+        }
+    }
+
+    @Test
+    fun `pre-action failure preserves an existing error status and skips controller`() {
+        val order = mutableListOf<String>()
+        val pipeline = createPipeline(
+            preActions = listOf(
+                ExchangeAction {
+                    it.response.status = 429
+                    throw RuntimeException("pre-boom")
+                },
+                ExchangeAction { order.add("next guard"); null },
+            ),
+            action = ExchangeAction { order.add("action"); null },
+            postActions = listOf(ExchangeAction { order.add("post"); null }),
+        )
+        val exchange = createExchange(pipeline)
         pipeline(exchange)
 
-        assertEquals(500, responseSource._status)
-        // Action should still run since response is not committed
-        // Actually, the status is set to 500 which is isHttpError, so action doesn't re-set status
-        assertTrue(exchange.exceptions.isNotEmpty())
+        assertEquals(429, exchange.response.status)
+        assertEquals(listOf("post"), order)
+    }
+
+    @Test
+    fun `termination in pre-action skips all remaining actions and cleans up context`() {
+        val order = mutableListOf<String>()
+        val pipeline = createPipeline(
+            preActions = listOf(
+                ExchangeAction { throw TerminateExchangeException() },
+                ExchangeAction { order.add("next guard"); null },
+            ),
+            action = ExchangeAction { order.add("action"); null },
+            postActions = listOf(ExchangeAction { order.add("post"); null }),
+        )
+        val exchange = createExchange(pipeline)
+
+        assertFailsWith<TerminateExchangeException> { pipeline(exchange) }
+
+        assertTrue(order.isEmpty())
+        assertEquals(ExchangeState.COMPLETE, exchange.state)
+        assertNull(Exchange.getExchange())
     }
 
     @Test

@@ -54,7 +54,7 @@ This design works equally well for traditional server-rendered web applications,
 Gradle dependency:
 
 ```kotlin
-implementation("org.tekfive:kviash:1.0.2")
+implementation("org.tekfive:kviash:1.0.3")
 ```
 
 ## Development
@@ -564,6 +564,12 @@ consume the request body or count as a body parameter. Without a registered
 provider, a type with a `FromJsonObject` companion is parsed from the request body.
 
 ## Error Handling
+
+A pre-action exception stops all remaining pre-actions and skips the controller,
+even if the response has not been committed. This includes `ReturnErrorStatus`
+exceptions such as `ReturnErrorStatus.onForbidden()`. Post-actions still run when
+the response is uncommitted so they can render an error response.
+`TerminateExchangeException` also skips post-actions.
 
 Register error handlers at any scope level:
 

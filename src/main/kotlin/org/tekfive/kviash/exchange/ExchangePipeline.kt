@@ -170,6 +170,7 @@ class ExchangePipeline (
             }
 
             exchange._state = ExchangeState.PRE_ACTIONS
+            var preActionFailed = false
             for (preAction in preActions) {
                 if (!exchange.response.committed) {
                     try {
@@ -180,12 +181,14 @@ class ExchangePipeline (
                             }
                         }
                     } catch (e: Exception) {
+                        preActionFailed = true
                         onException(e, exchange)
+                        break
                     }
                 }
             }
 
-            if (!exchange.response.committed) {
+            if (!preActionFailed && !exchange.response.committed) {
                 exchange._state = ExchangeState.ACTION
                 try {
                     checkStatusAfter {
